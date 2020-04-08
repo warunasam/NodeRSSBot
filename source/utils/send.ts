@@ -4,6 +4,7 @@ import {
 } from '../proxies/subscribes';
 import logger from './logger';
 import sanitize from './sanitize';
+import unsanitize from './unsanitize';
 import { config } from '../config';
 import Telegraf, { ContextMessageUpdate } from 'telegraf';
 import { Feed, FeedItem } from '../types/feed';
@@ -64,28 +65,56 @@ const send = async (
     } else {
         subscribers.map(async (subscribe) => {
             const userId = subscribe.user_id;
-            let text = `<b>${sanitize(feed.feed_title)}</b>`;
-            toSend.forEach(function (item) {
-                text += `\n<a href="${item.link.trim()}">${sanitize(
-                    item.title
-                )}</a>`;
-            });
-            try {
-                await bot.telegram.sendMessage(userId, text, {
-                    parse_mode: 'HTML',
-                    disable_web_page_preview: true
-                });
-            } catch (e) {
-                const resend = handlerSendError(e, userId);
-                if (resend && e.parameters?.migrate_to_chat_id) {
-                    await bot.telegram.sendMessage(
-                        e.parameters.migrate_to_chat_id,
-                        text,
-                        {
+            let text = '';
+            if (toSend.length <= 5) {
+                for (let i = 0; i < toSend.length; i++) {
+                    text = `<b>${unsanitize(toSend[i].title)}</b>\n\n${unsanitize(toSend[i].content)}`;
+
+                    try {
+                        await bot.telegram.sendMessage(userId, text, {
                             parse_mode: 'HTML',
                             disable_web_page_preview: true
+                        });
+                    } catch (e) {
+                        const resend = handlerSendError(e, userId);
+                        if (resend && e.parameters?.migrate_to_chat_id) {
+                            await bot.telegram.sendMessage(
+                                e.parameters.migrate_to_chat_id,
+                                text,
+                                {
+                                    parse_mode: 'HTML',
+                                    disable_web_page_preview: true
+                                }
+                            );
                         }
-                    );
+                    }
+                }
+            }
+            else{
+                text = `<b>${sanitize(feed.feed_title)}</b>`;
+                toSend.forEach(function (item) {
+                    text += `\n<a href="${item.link.trim()}">${sanitize(
+                        item.title
+                    )}</a>`;
+                });
+
+                try {
+                    await bot.telegram.sendMessage(userId, text, {
+                        parse_mode: 'HTML',
+                        disable_web_page_preview: true
+                    });
+                } catch (e) {
+                    const resend = handlerSendError(e, userId);
+                    if (resend && e.parameters?.migrate_to_chat_id) {
+                        await bot.telegram.sendMessage(
+                            e.parameters.migrate_to_chat_id,
+                            text,
+                            {
+                                parse_mode: 'HTML',
+                                disable_web_page_preview: true
+                            }
+                        );
+                    }
                 }
             }
         });
